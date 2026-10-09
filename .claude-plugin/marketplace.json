@@ -1,0 +1,15 @@
+{
+  "name": "testproject-mods",
+  "owner": {
+    "name": "randy-kauffman"
+  },
+  "metadata": {
+    "description": "Mods de Claude Code: barra de progreso y panel de costos de la sesión."
+  },
+  "plugins": [
+    {
+      "name": "session-meter",
+      "source": "./plugins/session-meter"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "name": "session-meter",
+  "version": "0.1.0",
+  "description": "Progress bar above the prompt driven by Claude's own task list, plus a session panel (/session-meter) with cost, tokens, context and time for the main loop and every subagent.",
+  "author": {
+    "name": "randy-kauffman",
+    "url": "https://github.com/randy-kauffman"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language",
+      "description": "auto follows Claude Code's language setting, then the system locale",
+      "default": "auto",
+      "options": [
+        "auto",
+        "es",
+        "en",
+        "ru"
+      ]
+    },
+    "band": {
+      "type": "string",
+      "title": "Progress bar",
+      "description": "auto: shown while there is a task list or subagents; always: also a cost line when idle; off: never",
+      "default": "auto",
+      "options": [
+        "auto",
+        "always",
+        "off"
+      ]
+    },
+    "prices": {
+      "type": "string",
+      "title": "Price overrides",
+      "description": "USD per million tokens, checked before the built-in table: 'pattern=input/output/cacheRead/cacheWrite; ...', e.g. 'opus-5-5=4/20/0.2/5'",
+      "default": ""
+    }
+  },
+  "license": "MIT"
+}
