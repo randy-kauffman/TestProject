@@ -178,6 +178,7 @@ describe('session panel', () => {
 
   test('says so, with the figures as text, when no surface places the pane', { options: { language: 'es' } }, async ($, on) => {
     engine(on)
+    on('session.surfaces', () => ({ value: ['desktop' as const] }))
     on('ui.open', () => ({ value: { isPlaced: false as const, reason: 'no surface places panes' } }))
     on('ui.panes', () => ({ value: [{ id: 'session-meter', title: 'Sesión', isShown: false, isFocused: false, isPlaced: false }] }))
     await $.tool.call({ tool: 'TodoWrite', todos: todos(['completed', 'in_progress']) })
@@ -190,6 +191,16 @@ describe('session panel', () => {
       expect(text).toContain('Tareas · 1/2')
       expect(text).toContain('● Doing task 2')
     }
+  })
+
+  test('with no surface attached it never claims the pane opened', { options: { language: 'es' } }, async ($, on) => {
+    engine(on)
+    on('session.surfaces', () => ({ value: [] }))
+    on('ui.panes', () => ({ value: [] }))
+    const run = { command: 'session-meter', args: '', origin: { kind: 'human' }, presentation: { isFullscreen: false, columns: 100 } } as never
+    const { text } = (await $.command.run(run)) as { text: string }
+    expect(text).toContain('no muestra el panel')
+    expect(text).toContain('no surface attached')
   })
 
   test('texto prints the panel and debug says where it was drawn', async ($, on) => {

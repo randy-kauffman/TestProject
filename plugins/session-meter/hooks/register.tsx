@@ -355,6 +355,9 @@ async function togglePane($: EngineInterface): Promise<Toggle> {
   }
   await tick($)
   await refreshLedger($)
+  // With no surface attached the engine reports any pane as placed, yet nothing
+  // ever draws it (a cloud session watched from an app that draws no mod UI).
+  if ((await $.session.surfaces()).length === 0) return { state: 'unplaced', reason: 'no surface attached' }
   const opened = await $.ui.open({ id: PANE, title: tr().pane })
   return opened.isPlaced ? { state: 'opened' } : { state: 'unplaced', reason: opened.reason }
 }

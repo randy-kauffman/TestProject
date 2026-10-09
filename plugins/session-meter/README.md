@@ -33,6 +33,10 @@ En `/config`, o a mano en `~/.claude/settings.json`:
 - `band`: `auto` muestra la barra cuando hay lista de tareas o subagentes; `always` además muestra una línea con el costo cuando no hay nada; `off` nunca la muestra.
 - `prices`: precios propios en USD por millón de tokens, que se miran antes de la tabla incluida: `fragmento-del-modelo=entrada/salida/lectura-cache/escritura-cache; ...`. Ejemplo: `opus-5-5=4/20/0.2/5; sonnet=2/10/0.2/2.5`.
 
+## Dónde se ve
+
+La barra y el panel los dibuja la interfaz de Claude Code: la terminal o la app de escritorio en una sesión local. Una sesión en la nube vista desde una app que no dibuja mods no muestra ninguno de los dos; ahí `/session-meter` avisa y muestra el resumen en texto, igual que `/session-meter texto`.
+
 ## Instalación
 
 En una sesión de Claude Code en la terminal:
