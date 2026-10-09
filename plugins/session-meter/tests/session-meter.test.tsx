@@ -176,6 +176,22 @@ describe('session panel', () => {
     expect(text).toMatch(/Other \(compaction, forks\): 110k tok · ≈\$0\.60/)
   })
 
+  test('says so, with the figures as text, when no surface places the pane', { options: { language: 'es' } }, async ($, on) => {
+    engine(on)
+    on('ui.open', () => ({ value: { isPlaced: false as const, reason: 'no surface places panes' } }))
+    on('ui.panes', () => ({ value: [{ id: 'session-meter', title: 'Sesión', isShown: false, isFocused: false, isPlaced: false }] }))
+    await $.tool.call({ tool: 'TodoWrite', todos: todos(['completed', 'in_progress']) })
+    const run = { command: 'session-meter', args: '', origin: { kind: 'human' }, presentation: { isFullscreen: false, columns: 100 } } as never
+    // Run twice: an undrawn pane is reopened, never toggled closed unseen.
+    for (let i = 0; i < 2; i++) {
+      const { text } = (await $.command.run(run)) as { text: string }
+      expect(text).toContain('no muestra el panel')
+      expect(text).toContain('no surface places panes')
+      expect(text).toContain('Tareas · 1/2')
+      expect(text).toContain('● Doing task 2')
+    }
+  })
+
   test('speaks Spanish', { options: { language: 'es' } }, async ($, on) => {
     engine(on)
     for (const surface of SURFACES) {

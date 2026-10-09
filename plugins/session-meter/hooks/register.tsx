@@ -57,6 +57,7 @@ const STRINGS = {
     done: 'Listo',
     opened: 'Panel de sesión abierto.',
     closed: 'Panel de sesión cerrado.',
+    unplaced: 'La app conectada no muestra el panel en esta sesión; acá va el resumen en texto',
     costNote: 'Total: cifra del motor (/cost). Por fila: estimación con la tabla de precios.',
     costNoteEstimate: 'Todo es estimación con la tabla de precios (el motor no informó costo).',
     noPrice: 'sin precio',
@@ -84,6 +85,7 @@ const STRINGS = {
     done: 'Done',
     opened: 'Session panel opened.',
     closed: 'Session panel closed.',
+    unplaced: 'The attached app does not show the panel in this session; here is the summary as text',
     costNote: "Total: the engine's figure (/cost). Per row: an estimate from the price table.",
     costNoteEstimate: 'All figures are estimates from the price table (the engine reported no cost).',
     noPrice: 'no price',
@@ -111,6 +113,7 @@ const STRINGS = {
     done: 'Готово',
     opened: 'Панель сессии открыта.',
     closed: 'Панель сессии закрыта.',
+    unplaced: 'Подключённое приложение не показывает панель в этой сессии; вот сводка текстом',
     costNote: 'Итого: данные движка (/cost). По строкам: оценка по таблице цен.',
     costNoteEstimate: 'Все суммы — оценка по таблице цен (движок не сообщил стоимость).',
     noPrice: 'нет цены',
@@ -329,16 +332,20 @@ async function tick($: EngineInterface): Promise<void> {
   await update($, now, () => at)
 }
 
-async function togglePane($: EngineInterface): Promise<boolean> {
-  const isOpen = (await $.ui.panes()).some(p => p.id === PANE)
-  if (isOpen) {
+type Toggle = { state: 'opened' | 'closed' } | { state: 'unplaced'; reason: string }
+
+// Opens the pane, or closes it when a surface shows it. A pane left open but
+// undrawn (no surface places panes) is opened again, never closed unseen.
+async function togglePane($: EngineInterface): Promise<Toggle> {
+  const pane = (await $.ui.panes()).find(p => p.id === PANE)
+  if (pane?.isPlaced) {
     await $.ui.close({ id: PANE })
-    return false
+    return { state: 'closed' }
   }
   await tick($)
   await refreshLedger($)
-  await $.ui.open({ id: PANE, title: tr().pane })
-  return true
+  const opened = await $.ui.open({ id: PANE, title: tr().pane })
+  return opened.isPlaced ? { state: 'opened' } : { state: 'unplaced', reason: opened.reason }
 }
 
 const elapsed = (a: AgentRun, at: number): number => (a.endedAt ?? Math.max(at, a.startedAt)) - a.startedAt
@@ -555,6 +562,34 @@ const passThrough = <E, R>(_$: unknown, e: E, next: (e: E) => R): R => next(e)
 
 const TASK_GLYPH: Record<TaskStatus, string> = { completed: '✓', in_progress: '●', pending: '○' }
 
+// The panel as plain lines, for a session whose app shows no panes.
+async function summaryText($: EngineInterface): Promise<string> {
+  const s = tr()
+  const list = await read($, agents)
+  const taskList = await read($, tasks)
+  const m = await read($, main)
+  const o = await read($, other)
+  const l = await read($, ledger)
+  const at = await $.clock.now()
+  const t = totalsOf([...(m ? [m] : []), ...list, ...(o ? [o] : [])], l, at)
+  const prog = progressOf(taskList, await read($, flow))
+  const meterLine = (r: Row) =>
+    `${r.title}${r.type === 'main' ? '' : ` (${r.type})`} ${r.status === 'done' ? '✓' : r.status === 'failed' ? '✗' : '●'} — ${r.meta.join(' · ')} · ${r.steps ? r.steps + ' · ' : ''}ctx ${ctxPct(r.meter)}% · ${fmtTokens(r.meter.tokens)} tok · ${fmtMeterCost(r.meter)} · ${r.time}`
+  const lines = [
+    `${s.cost} ${fmtTotalCost(t)} · ${fmtTokens(t.tokens)} ${s.tokensWord} · ${s.time} ${fmtTime(t.time)}${l?.contextPercent === undefined ? '' : ` · ${s.context} ${l.contextPercent}%`}`,
+    '',
+    prog ? `${s.tasks} · ${prog.isFinished ? s.done : `${prog.done}/${prog.total}`}` : s.noTasks,
+    ...taskList.map(task => `  ${TASK_GLYPH[task.status]} ${task.status === 'in_progress' ? task.active || task.title : task.title}`),
+    '',
+    ...(m ? [meterLine(mainRow(m, l, t))] : []),
+    ...(list.length ? [...list].reverse().map(a => meterLine(agentRow(a, at))) : [s.noAgents]),
+    ...(o ? [`${s.other}: ${fmtTokens(o.tokens)} tok · ${fmtMeterCost(o)}`] : []),
+    '',
+    t.isEstimate ? s.costNoteEstimate : s.costNote,
+  ]
+  return lines.join('\n')
+}
+
 export const register: Register = (on, options) => {
   // Options are known at load; only `auto` language waits for the session's settings.
   bandMode = options.band === 'always' || options.band === 'off' ? options.band : 'auto'
@@ -627,8 +662,10 @@ export const register: Register = (on, options) => {
   }).catch(passThrough)
 
   on('command.run', { command: 'session-meter' }, async $ => {
-    const isOpen = await togglePane($)
-    return { text: isOpen ? tr().opened : tr().closed }
+    const toggled = await togglePane($)
+    if (toggled.state !== 'unplaced') return { text: toggled.state === 'opened' ? tr().opened : tr().closed }
+    // Never claim a pane nobody can see: say why, and show the figures here instead.
+    return { text: `${tr().unplaced} (${toggled.reason})\n\n${await summaryText($)}` }
   })
 
   // --- the task list ---------------------------------------------------------
