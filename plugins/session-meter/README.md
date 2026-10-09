@@ -7,7 +7,7 @@ Inspirado en [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main
 ## Qué muestra
 
 - **Barra de progreso**: la tarea en curso, tareas hechas de las planificadas, porcentaje y costo de la sesión, con el cangrejo caminando mientras Claude trabaja. Se alimenta sola de `TodoWrite` o de `TaskCreate`/`TaskUpdate`/`TaskList`. El botón `×N` (o `≡`) abre el panel y `✕` la oculta hasta la próxima tanda de tareas.
-- **Panel de sesión** (`/session-meter` lo abre y lo cierra): costo total, tokens, tiempo y contexto usado; la lista de tareas; la sesión principal y cada subagente (en curso y terminados) con modelo, esfuerzo, contexto, tokens, costo estimado y tiempo; y lo que el motor corre por su cuenta (compactación, forks).
+- **Panel de sesión** (`/session-meter` lo abre y lo cierra; `/session-meter texto` lo muestra como texto en la conversación, y `/session-meter debug` dice en qué superficie se dibujó): costo total, tokens, tiempo y contexto usado; la lista de tareas; la sesión principal y cada subagente (en curso y terminados) con modelo, esfuerzo, contexto, tokens, costo estimado y tiempo; y lo que el motor corre por su cuenta (compactación, forks).
 
 ## Herramientas que agrega
 

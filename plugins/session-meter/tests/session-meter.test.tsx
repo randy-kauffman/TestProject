@@ -192,6 +192,18 @@ describe('session panel', () => {
     }
   })
 
+  test('texto prints the panel and debug says where it was drawn', async ($, on) => {
+    engine(on)
+    on('ui.panes', () => ({ value: [] }))
+    on('session.surfaces', () => ({ value: ['desktop' as const] }))
+    await $.tool.call({ tool: 'TodoWrite', todos: todos(['in_progress']) })
+    const ui = await $.ui.mount(pane('desktop'))
+    await ui.unmount()
+    const run = (args: string) => ({ command: 'session-meter', args, origin: { kind: 'human' }, presentation: { isFullscreen: false, columns: 100 } }) as never
+    expect(((await $.command.run(run('texto'))) as { text: string }).text).toContain('Tasks · 0/1')
+    expect(((await $.command.run(run('debug'))) as { text: string }).text).toContain('Pane@desktop ×1')
+  })
+
   test('speaks Spanish', { options: { language: 'es' } }, async ($, on) => {
     engine(on)
     for (const surface of SURFACES) {

@@ -57,6 +57,7 @@ const STRINGS = {
     done: 'Listo',
     opened: 'Panel de sesión abierto.',
     closed: 'Panel de sesión cerrado.',
+    textHint: '¿No lo ves? /session-meter texto lo muestra acá.',
     unplaced: 'La app conectada no muestra el panel en esta sesión; acá va el resumen en texto',
     costNote: 'Total: cifra del motor (/cost). Por fila: estimación con la tabla de precios.',
     costNoteEstimate: 'Todo es estimación con la tabla de precios (el motor no informó costo).',
@@ -85,6 +86,7 @@ const STRINGS = {
     done: 'Done',
     opened: 'Session panel opened.',
     closed: 'Session panel closed.',
+    textHint: "Can't see it? /session-meter texto prints it here.",
     unplaced: 'The attached app does not show the panel in this session; here is the summary as text',
     costNote: "Total: the engine's figure (/cost). Per row: an estimate from the price table.",
     costNoteEstimate: 'All figures are estimates from the price table (the engine reported no cost).',
@@ -113,6 +115,7 @@ const STRINGS = {
     done: 'Готово',
     opened: 'Панель сессии открыта.',
     closed: 'Панель сессии закрыта.',
+    textHint: 'Не видно? /session-meter texto покажет здесь.',
     unplaced: 'Подключённое приложение не показывает панель в этой сессии; вот сводка текстом',
     costNote: 'Итого: данные движка (/cost). По строкам: оценка по таблице цен.',
     costNoteEstimate: 'Все суммы — оценка по таблице цен (движок не сообщил стоимость).',
@@ -332,7 +335,15 @@ async function tick($: EngineInterface): Promise<void> {
   await update($, now, () => at)
 }
 
-type Toggle = { state: 'opened' | 'closed' } | { state: 'unplaced'; reason: string }
+// Where the pane and the band were last drawn, per surface: what `debug` reports.
+// Module scope on purpose: a diagnostic of this load, not session state.
+const draws = new Map<string, { count: number; at: number; detail: string }>()
+const noteDraw = (site: string, surface: string, detail: string, at: number): void => {
+  const key = `${site}@${surface}`
+  draws.set(key, { count: (draws.get(key)?.count ?? 0) + 1, at, detail })
+}
+
+type Toggle = { state: 'opened' } | { state: 'closed' } | { state: 'unplaced'; reason: string }
 
 // Opens the pane, or closes it when a surface shows it. A pane left open but
 // undrawn (no surface places panes) is opened again, never closed unseen.
@@ -632,7 +643,8 @@ export const register: Register = (on, options) => {
     })
     await $.command.register({
       name: 'session-meter',
-      description: 'Show or hide the session panel: cost, tokens, context and time for the main loop and every subagent',
+      description: 'Show or hide the session panel (cost, tokens, context, time); "texto" prints it as text, "debug" says where it is drawn',
+      argumentHint: '[texto | debug]',
     })
     await refreshLedger($)
 
@@ -661,9 +673,28 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(passThrough)
 
-  on('command.run', { command: 'session-meter' }, async $ => {
+  on('command.run', { command: 'session-meter' }, async ($, e) => {
+    const arg = e.args.trim().toLowerCase()
+    if (/^(texto|text|txt|текст)$/.test(arg)) {
+      await refreshLedger($)
+      return { text: await summaryText($) }
+    }
+    if (arg === 'debug') {
+      const at = await $.clock.now()
+      const panes = await $.ui.panes()
+      const lines = [
+        `surfaces: ${(await $.session.surfaces()).join(', ') || '(none)'}`,
+        `panes: ${panes.map(p => `${p.id} placed=${p.isPlaced} shown=${p.isShown} focused=${p.isFocused}`).join('; ') || '(none)'}`,
+        `language=${lang} band=${bandMode}`,
+        'draws:',
+        ...([...draws].map(([k, v]) => `  ${k} ×${v.count}, ${Math.round((at - v.at) / 1000)}s ago, ${v.detail}`) || []),
+      ]
+      if (draws.size === 0) lines.push('  (nothing drawn since the mod loaded)')
+      return { text: lines.join('\n') }
+    }
     const toggled = await togglePane($)
-    if (toggled.state !== 'unplaced') return { text: toggled.state === 'opened' ? tr().opened : tr().closed }
+    if (toggled.state === 'closed') return { text: tr().closed }
+    if (toggled.state === 'opened') return { text: `${tr().opened} ${tr().textHint}` }
     // Never claim a pane nobody can see: say why, and show the figures here instead.
     return { text: `${tr().unplaced} (${toggled.reason})\n\n${await summaryText($)}` }
   })
@@ -847,6 +878,7 @@ export const register: Register = (on, options) => {
   // --- drawing ---------------------------------------------------------------
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    noteDraw('Pane', e.surface, `placement=${e.props.placement} cols=${e.props.bodyColumns}`, await $.clock.now())
     const s = tr()
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
@@ -969,6 +1001,7 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    noteDraw('AbovePrompt', e.surface, `cols=${e.props.bodyColumns}`, await $.clock.now())
     if (bandMode === 'off' || e.props.hasSurvey) return next(e)
     const p: Panel = await read($, panel)
     if (p.isBandHidden) return next(e)
